@@ -1,0 +1,1 @@
+option('install_examples', type: 'boolean', value: false)
