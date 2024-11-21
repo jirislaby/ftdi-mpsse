@@ -60,5 +60,6 @@ static inline void ftdi_mpsse_set_gpio(struct ftdi_mpsse *ftdi_mpsse, uint8_t gp
 }
 
 #include <ftdi_i2c.h>
+#include <ftdi_spi.h>
 
 #endif

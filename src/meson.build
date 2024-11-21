@@ -1,5 +1,5 @@
 mpsse_lib = shared_library('ftdi_mpsse',
-  [ 'error.c', 'i2c.c', 'mpsse.c' ],
+  [ 'error.c', 'i2c.c', 'mpsse.c', 'spi.c' ],
   dependencies: ftdi,
   include_directories: [ '../include' ],
   install: true,
