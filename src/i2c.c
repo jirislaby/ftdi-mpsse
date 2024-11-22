@@ -202,7 +202,8 @@ static int ftdi_i2c_check_bufs(struct ftdi_mpsse *ftdi_mpsse, uint8_t *ibuf, siz
 		return 0;
 
 	if (ftdi_mpsse->debug & MPSSE_DEBUG_FLUSHING)
-		fprintf(stderr, "%s: flushing obuf_cnt=%u\n", __func__, ftdi_mpsse->obuf_cnt);
+		fprintf(stderr, "%s: flushing acks=%u bytes=%u obuf_cnt=%u\n", __func__,
+			ftdi_mpsse->i2c.acks, ftdi_mpsse->i2c.bytes, ftdi_mpsse->obuf_cnt);
 
 	ftdi_mpsse_enqueue(ftdi_mpsse, CMD_SEND_IMMEDIATE);
 	int ret = ftdi_mpsse_flush(ftdi_mpsse);
@@ -210,25 +211,10 @@ static int ftdi_i2c_check_bufs(struct ftdi_mpsse *ftdi_mpsse, uint8_t *ibuf, siz
 		return ret;
 
 	ret = ftdi_i2c_check_ack(ftdi_mpsse, false);
-	if (ftdi_mpsse->debug & MPSSE_DEBUG_ACKS) {
-		fprintf(stderr, "%s: acks=%u obuf_cnt=%u\n",
-			__func__, ftdi_mpsse->i2c.acks, ftdi_mpsse->obuf_cnt);
-	}
 	if (ret < 0)
 		return ret;
 
 	return ftdi_i2c_check_rx(ftdi_mpsse, ibuf, size, false);
-}
-
-static int ftdi_i2c_inc_ack_check(struct ftdi_mpsse *ftdi_mpsse)
-{
-	ftdi_mpsse->i2c.acks++;
-	if (ftdi_mpsse->debug & MPSSE_DEBUG_ACKS) {
-		fprintf(stderr, "%s: acks=%u obuf_cnt=%u\n",
-			__func__, ftdi_mpsse->i2c.acks, ftdi_mpsse->obuf_cnt);
-	}
-
-	return ftdi_i2c_check_bufs(ftdi_mpsse, NULL, 0);
 }
 
 int ftdi_i2c_send(struct ftdi_mpsse *ftdi_mpsse, unsigned char c)
@@ -244,8 +230,9 @@ int ftdi_i2c_send(struct ftdi_mpsse *ftdi_mpsse, unsigned char c)
 	ftdi_mpsse_enqueue(ftdi_mpsse, CMD(CMD_IN_RISING, CMD_BIT, CMD_MSB, CMD_IN));
 	/* len = 0 means 1 bit */
 	ftdi_mpsse_enqueue(ftdi_mpsse, 0x00);
+	ftdi_mpsse->i2c.acks++;
 
-	return ftdi_i2c_inc_ack_check(ftdi_mpsse);
+	return ftdi_i2c_check_bufs(ftdi_mpsse, NULL, 0);
 }
 
 int ftdi_i2c_send_check_ack(struct ftdi_mpsse *ftdi_mpsse, unsigned char c)
