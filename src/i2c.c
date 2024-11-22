@@ -204,13 +204,13 @@ int ftdi_i2c_send(struct ftdi_mpsse *ftdi_mpsse, unsigned char c)
 {
 	ftdi_mpsse_set_pins(ftdi_mpsse, PIN_SDA, PIN_SCL | PIN_SDA);
 
-	ftdi_mpsse_enqueue(ftdi_mpsse, CMD_MSB_FALLING_EDGE_BIT_OUT);
+	ftdi_mpsse_enqueue(ftdi_mpsse, CMD(CMD_OUT_FALLING, CMD_BIT, CMD_MSB, CMD_OUT));
 	ftdi_mpsse_enqueue(ftdi_mpsse, 0x07);
 	ftdi_mpsse_enqueue(ftdi_mpsse, c);
 
 	ftdi_mpsse_set_pins(ftdi_mpsse, 0, PIN_SCL);
 
-	ftdi_mpsse_enqueue(ftdi_mpsse, CMD_MSB_RISING_EDGE_BIT_IN);
+	ftdi_mpsse_enqueue(ftdi_mpsse, CMD(CMD_IN_RISING, CMD_BIT, CMD_MSB, CMD_IN));
 	/* len = 0 means 1 bit */
 	ftdi_mpsse_enqueue(ftdi_mpsse, 0x00);
 
@@ -235,7 +235,7 @@ static void ftdi_i2c_send_ack(struct ftdi_mpsse *ftdi_mpsse, bool ack)
 {
 	ftdi_mpsse_set_pins(ftdi_mpsse, 0, PIN_SCL | PIN_SDA);
 
-	ftdi_mpsse_enqueue(ftdi_mpsse, CMD_MSB_FALLING_EDGE_BIT_OUT);
+	ftdi_mpsse_enqueue(ftdi_mpsse, CMD(CMD_OUT_FALLING, CMD_BIT, CMD_MSB, CMD_OUT));
 	ftdi_mpsse_enqueue(ftdi_mpsse, 0x00);
 	ftdi_mpsse_enqueue(ftdi_mpsse, ack ? 0x00 : 0x80);
 }
@@ -248,7 +248,7 @@ int ftdi_i2c_recv_send_ack(struct ftdi_mpsse *ftdi_mpsse, uint8_t *buf,
 	for (size_t i = 0; i < count; i++) {
 		ftdi_mpsse_set_pins(ftdi_mpsse, 0, PIN_SCL);
 
-		ftdi_mpsse_enqueue(ftdi_mpsse, CMD_MSB_RISING_EDGE_BIT_IN);
+		ftdi_mpsse_enqueue(ftdi_mpsse, CMD(CMD_IN_RISING, CMD_BIT, CMD_MSB, CMD_IN));
 		ftdi_mpsse_enqueue(ftdi_mpsse, 0x07);
 
 		bool nack = last_nack && i == count - 1;
