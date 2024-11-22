@@ -35,11 +35,17 @@ int ftdi_i2c_init(struct ftdi_mpsse *ftdi_mpsse,
 	ftdi_mpsse_enqueue(ftdi_mpsse, CMD_CLK_DIV5_DIS);
 	ftdi_mpsse_enqueue(ftdi_mpsse, CMD_CLK_ADAPTIVE_DIS);
 	ftdi_mpsse_enqueue(ftdi_mpsse, CMD_CLK_3PHASE_EN);
+	/*
+	 * this is recommended for i2c in the datasheet but breaks bme and oled
+	 * (high speed transfers likely)
+	 */
+#if 0
 	if (ftdi_mpsse->ftdic.type == TYPE_232H) {
 		ftdi_mpsse_enqueue(ftdi_mpsse, CMD_DRIVE_ONLY_ZERO);
 		ftdi_mpsse_enqueue(ftdi_mpsse, 0x03);
 		ftdi_mpsse_enqueue(ftdi_mpsse, 0x00);
 	}
+#endif
 
 	ret = ftdi_mpsse_flush(ftdi_mpsse);
 	if (ret <= 0) {
