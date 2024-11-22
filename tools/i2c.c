@@ -63,7 +63,7 @@ static void hex_dump(const char *head, const void *buf, unsigned int len)
 {
 	const uint8_t *buf8 = buf;
 
-	printf(head);
+	printf("%s", head);
 	for (unsigned i = 0; i < len; i++) {
 		if (!(i % 16))
 			printf("\n  0x%.2x:", i);
