@@ -27,7 +27,7 @@ void ftdi_i2c_close(struct ftdi_mpsse *ftdi_mpsse);
 
 int ftdi_i2c_begin(struct ftdi_mpsse *ftdi_mpsse, uint8_t address,
 		   bool write);
-int ftdi_i2c_send(struct ftdi_mpsse *ftdi_mpsse, uint8_t c);
+int ftdi_i2c_enqueue_writebyte(struct ftdi_mpsse *ftdi_mpsse, uint8_t c);
 int ftdi_i2c_send_check_ack(struct ftdi_mpsse *ftdi_mpsse, uint8_t c);
 int ftdi_i2c_recv_send_ack(struct ftdi_mpsse *ftdi_mpsse, uint8_t *buf,
 			   size_t count, bool last_nack);

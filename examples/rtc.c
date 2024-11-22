@@ -118,14 +118,14 @@ int main(int argc, char **argv)
 		if (ret < 0)
 			errx(EXIT_FAILURE, "%s (%d): %s\n", __func__, __LINE__,
 			     ftdi_mpsse_get_error(&ftdi_mpsse));
-		ftdi_i2c_send(&ftdi_mpsse, 0x00);
-		ftdi_i2c_send(&ftdi_mpsse, hex2bcd(tm->tm_sec));
-		ftdi_i2c_send(&ftdi_mpsse, hex2bcd(tm->tm_min));
-		ftdi_i2c_send(&ftdi_mpsse, hex2bcd(tm->tm_hour));
-		ftdi_i2c_send(&ftdi_mpsse, tm->tm_wday + 1);
-		ftdi_i2c_send(&ftdi_mpsse, hex2bcd(tm->tm_mday));
-		ftdi_i2c_send(&ftdi_mpsse, hex2bcd(tm->tm_mon + 1));
-		ftdi_i2c_send(&ftdi_mpsse, hex2bcd(tm->tm_year % 100));
+		ftdi_i2c_enqueue_writebyte(&ftdi_mpsse, 0x00);
+		ftdi_i2c_enqueue_writebyte(&ftdi_mpsse, hex2bcd(tm->tm_sec));
+		ftdi_i2c_enqueue_writebyte(&ftdi_mpsse, hex2bcd(tm->tm_min));
+		ftdi_i2c_enqueue_writebyte(&ftdi_mpsse, hex2bcd(tm->tm_hour));
+		ftdi_i2c_enqueue_writebyte(&ftdi_mpsse, tm->tm_wday + 1);
+		ftdi_i2c_enqueue_writebyte(&ftdi_mpsse, hex2bcd(tm->tm_mday));
+		ftdi_i2c_enqueue_writebyte(&ftdi_mpsse, hex2bcd(tm->tm_mon + 1));
+		ftdi_i2c_enqueue_writebyte(&ftdi_mpsse, hex2bcd(tm->tm_year % 100));
 		ftdi_i2c_end(&ftdi_mpsse);
 	}
 

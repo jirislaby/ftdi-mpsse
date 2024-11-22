@@ -83,7 +83,7 @@ int main(int argc, char **argv)
 	for (unsigned r = 0; r < 64 / 8; r++) {
 		unsigned char pat = rand();
 		for (unsigned a = 0; a < 128; a++)
-			ftdi_i2c_send(&ftdi_mpsse, pat);
+			ftdi_i2c_enqueue_writebyte(&ftdi_mpsse, pat);
 	}
 	for (unsigned cnt = 0; cnt < 4; cnt++)
 		for (unsigned let = 'A'; let < 'A' + 32; let++)
@@ -91,7 +91,7 @@ int main(int argc, char **argv)
 				unsigned char draw = 0;
 				for (unsigned row = 0; row < 8; row++)
 					draw |= !!(font8x8_basic[let + (cnt % 2) * 32][row] & BIT(col)) << row;
-				ftdi_i2c_send(&ftdi_mpsse, draw);
+				ftdi_i2c_enqueue_writebyte(&ftdi_mpsse, draw);
 			}
 	ftdi_i2c_end(&ftdi_mpsse);
 

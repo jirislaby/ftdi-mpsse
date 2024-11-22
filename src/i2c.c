@@ -72,8 +72,7 @@ close:
 #define SECOND_CYCLES	20
 #define STOP_CYCLES	10
 
-/* start condition for the I2C bus */
-static void ftdi_i2c_start(struct ftdi_mpsse *ftdi_mpsse)
+static void ftdi_i2c_enqueue_start(struct ftdi_mpsse *ftdi_mpsse)
 {
 	unsigned int a;
 
@@ -87,7 +86,7 @@ static void ftdi_i2c_start(struct ftdi_mpsse *ftdi_mpsse)
 	ftdi_mpsse_set_pins(ftdi_mpsse, 0, PIN_SCL | PIN_SDA);
 }
 
-static void ftdi_i2c_stop(struct ftdi_mpsse *ftdi_mpsse)
+static void ftdi_i2c_enqueue_stop(struct ftdi_mpsse *ftdi_mpsse)
 {
 	unsigned int a;
 
@@ -111,7 +110,7 @@ int ftdi_i2c_begin(struct ftdi_mpsse *ftdi_mpsse, uint8_t address, bool write)
 					      "wrong address (containing R/W bit?)");
 	}
 
-	ftdi_i2c_start(ftdi_mpsse);
+	ftdi_i2c_enqueue_start(ftdi_mpsse);
 	ftdi_mpsse->i2c.address = address;
 
 	return ftdi_i2c_send_check_ack(ftdi_mpsse, address << 1 | !write);
@@ -217,7 +216,7 @@ static int ftdi_i2c_check_bufs(struct ftdi_mpsse *ftdi_mpsse, uint8_t *ibuf, siz
 	return ftdi_i2c_check_rx(ftdi_mpsse, ibuf, size, false);
 }
 
-int ftdi_i2c_send(struct ftdi_mpsse *ftdi_mpsse, unsigned char c)
+int ftdi_i2c_enqueue_writebyte(struct ftdi_mpsse *ftdi_mpsse, uint8_t c)
 {
 	ftdi_mpsse_set_pins(ftdi_mpsse, PIN_SDA, PIN_SCL | PIN_SDA);
 
@@ -235,11 +234,14 @@ int ftdi_i2c_send(struct ftdi_mpsse *ftdi_mpsse, unsigned char c)
 	return ftdi_i2c_check_bufs(ftdi_mpsse, NULL, 0);
 }
 
-int ftdi_i2c_send_check_ack(struct ftdi_mpsse *ftdi_mpsse, unsigned char c)
+int ftdi_i2c_send_check_ack(struct ftdi_mpsse *ftdi_mpsse, uint8_t c)
 {
 	int ret;
 
-	ftdi_i2c_send(ftdi_mpsse, c);
+	ret = ftdi_i2c_enqueue_writebyte(ftdi_mpsse, c);
+	if (ret < 0)
+		return ret;
+
 	//ftdi_mpsse_enqueue(ftdi_mpsse, CMD_SEND_IMMEDIATE);
 
 	ret = ftdi_mpsse_flush(ftdi_mpsse);
@@ -249,7 +251,16 @@ int ftdi_i2c_send_check_ack(struct ftdi_mpsse *ftdi_mpsse, unsigned char c)
 	return ftdi_i2c_check_ack(ftdi_mpsse, true);
 }
 
-static void ftdi_i2c_send_ack(struct ftdi_mpsse *ftdi_mpsse, bool ack)
+static void ftdi_i2c_enqueue_readbyte(struct ftdi_mpsse *ftdi_mpsse)
+{
+	ftdi_mpsse_set_pins(ftdi_mpsse, 0, PIN_SCL);
+
+	ftdi_mpsse_enqueue(ftdi_mpsse, CMD(CMD_IN_RISING, CMD_BIT, CMD_MSB, CMD_IN));
+	ftdi_mpsse_enqueue(ftdi_mpsse, 0x07);
+	ftdi_mpsse->i2c.bytes++;
+}
+
+static void ftdi_i2c_enqueue_ack(struct ftdi_mpsse *ftdi_mpsse, bool ack)
 {
 	ftdi_mpsse_set_pins(ftdi_mpsse, 0, PIN_SCL | PIN_SDA);
 
@@ -265,14 +276,10 @@ int ftdi_i2c_recv_send_ack(struct ftdi_mpsse *ftdi_mpsse, uint8_t *buf,
 	int ret;
 
 	for (size_t i = 0; i < count; i++) {
-		ftdi_mpsse_set_pins(ftdi_mpsse, 0, PIN_SCL);
-
-		ftdi_mpsse_enqueue(ftdi_mpsse, CMD(CMD_IN_RISING, CMD_BIT, CMD_MSB, CMD_IN));
-		ftdi_mpsse_enqueue(ftdi_mpsse, 0x07);
-		ftdi_mpsse->i2c.bytes++;
+		ftdi_i2c_enqueue_readbyte(ftdi_mpsse);
 
 		bool nack = last_nack && i == count - 1;
-		ftdi_i2c_send_ack(ftdi_mpsse, !nack);
+		ftdi_i2c_enqueue_ack(ftdi_mpsse, !nack);
 
 		/* wait a bit, some implementations are slow to catch up after an ACK */
 		for (unsigned int a = 0; a < ftdi_mpsse->i2c.loops_after_read_ack; a++) {
@@ -302,7 +309,7 @@ int ftdi_i2c_end(struct ftdi_mpsse *ftdi_mpsse)
 {
 	int ret;
 
-	ftdi_i2c_stop(ftdi_mpsse);
+	ftdi_i2c_enqueue_stop(ftdi_mpsse);
 
 	ret = ftdi_mpsse_flush(ftdi_mpsse);
 	if (ret < 0)
