@@ -117,49 +117,59 @@ int ftdi_i2c_begin(struct ftdi_mpsse *ftdi_mpsse, uint8_t address, bool write)
 	return ftdi_i2c_send_check_ack(ftdi_mpsse, address << 1 | !write);
 }
 
-static int ftdi_i2c_check_ack(struct ftdi_mpsse *ftdi_mpsse, bool check_all)
+static int ftdi_i2c_read_dev(struct ftdi_mpsse *ftdi_mpsse, uint8_t *ibuf, size_t size,
+			     size_t count, bool check_all)
 {
-	unsigned int acks = ftdi_mpsse->i2c.acks;
 	unsigned int to = 100;
 	unsigned int rd = 0;
-	uint8_t ibuf[acks + 16];
 
-	if (!acks)
+	if (!count)
 		return 0;
 
-	do {
-		int now_rd = ftdi_read_data(&ftdi_mpsse->ftdic, ibuf + rd, sizeof(ibuf) - rd);
+	while (1) {
+		int now_rd = ftdi_read_data(&ftdi_mpsse->ftdic, ibuf + rd, size - rd);
 		if (now_rd < 0)
-			return ftdi_mpsse_store_error(ftdi_mpsse, now_rd, true,
-						      "ftdi_read_data(ack read)");
+			return ftdi_mpsse_store_error(ftdi_mpsse, now_rd, true, "ftdi_read_data");
 
 		if (now_rd == 0 && to < 90)
-			fprintf(stderr, "i2c-%x: no input (rd=%d, acks=%u), trying (%u)\n",
-				ftdi_mpsse->i2c.address, rd, acks, to);
+			fprintf(stderr, "i2c-%x: no input (rd=%d, count=%zu), trying (%u)\n",
+				ftdi_mpsse->i2c.address, rd, count, to);
 		rd += now_rd;
-		if (rd >= acks)
+		if (rd >= count)
 			break;
-		if (!to--) {
-			fprintf(stderr, "TIMEOUT\n");
-			return -1;
-		}
-		usleep(10000);
-	} while (check_all);
+		if (!to--)
+			return ftdi_mpsse_store_error(ftdi_mpsse, -1, false, "TIMEOUT");
 
-	if (ftdi_mpsse->debug & MPSSE_DEBUG_ACKS) {
-		fprintf(stderr, "%s: i2c-%x: asked %zdB, received %dB (expected %u bits, c_a=%u):",
-			__func__, ftdi_mpsse->i2c.address, sizeof(ibuf), rd, acks, check_all);
+		if (!check_all)
+			break;
+
+		usleep(10000);
+	}
+
+	if (ftdi_mpsse->debug & MPSSE_DEBUG_READS) {
+		fprintf(stderr, "%s: i2c-%x: asked %zuB, received %uB (expected %zuB, c_a=%u):",
+			__func__, ftdi_mpsse->i2c.address, size, rd, count, check_all);
 		for (unsigned a = 0; a < rd; a++)
 			fprintf(stderr, " %02x", ibuf[a]);
 		fprintf(stderr, "\n");
 	}
 
-	if (acks > rd)
-		acks = rd;
+	return rd;
+}
 
-	ftdi_mpsse->i2c.acks -= acks;
+static int ftdi_i2c_check_ack(struct ftdi_mpsse *ftdi_mpsse, bool check_all)
+{
+	unsigned int acks = ftdi_mpsse->i2c.acks;
+	uint8_t ibuf[acks + 16];
+	int ret;
 
-	for (unsigned a = 0; a < acks; a++) {
+	ret = ftdi_i2c_read_dev(ftdi_mpsse, ibuf, sizeof(ibuf), acks, check_all);
+	if (ret <= 0)
+		return ret;
+
+	ftdi_mpsse->i2c.acks -= ret;
+
+	for (int a = 0; a < ret; a++) {
 		if (ibuf[a] & BIT(0)) {
 			return ftdi_mpsse_store_error(ftdi_mpsse, -1, false,
 						      "i2c-%x: received NACK at offset %u",
@@ -170,17 +180,29 @@ static int ftdi_i2c_check_ack(struct ftdi_mpsse *ftdi_mpsse, bool check_all)
 	return 0;
 }
 
-static int ftdi_i2c_inc_ack_check(struct ftdi_mpsse *ftdi_mpsse)
+static int ftdi_i2c_check_rx(struct ftdi_mpsse *ftdi_mpsse, uint8_t *ibuf, size_t size,
+			     bool check_all)
 {
-	ftdi_mpsse->i2c.acks++;
-	if (ftdi_mpsse->debug & MPSSE_DEBUG_ACKS) {
-		fprintf(stderr, "%s: acks=%u obuf_cnt=%u\n",
-			__func__, ftdi_mpsse->i2c.acks, ftdi_mpsse->obuf_cnt);
-	}
+	unsigned int bytes = ftdi_mpsse->i2c.bytes;
+	int ret;
 
-	if (ftdi_mpsse->i2c.acks < 3 * MPSSE_RX_BUFSIZE / 4 &&
+	ret = ftdi_i2c_read_dev(ftdi_mpsse, ibuf, size, bytes, check_all);
+	if (ret <= 0)
+		return ret;
+
+	ftdi_mpsse->i2c.bytes -= ret;
+
+	return ret;
+}
+
+static int ftdi_i2c_check_bufs(struct ftdi_mpsse *ftdi_mpsse, uint8_t *ibuf, size_t size)
+{
+	if (ftdi_mpsse->i2c.acks + ftdi_mpsse->i2c.bytes < 3 * MPSSE_RX_BUFSIZE / 4 &&
 	    ftdi_mpsse->obuf_cnt < 3 * MPSSE_TX_BUFSIZE / 4)
 		return 0;
+
+	if (ftdi_mpsse->debug & MPSSE_DEBUG_FLUSHING)
+		fprintf(stderr, "%s: flushing obuf_cnt=%u\n", __func__, ftdi_mpsse->obuf_cnt);
 
 	ftdi_mpsse_enqueue(ftdi_mpsse, CMD_SEND_IMMEDIATE);
 	int ret = ftdi_mpsse_flush(ftdi_mpsse);
@@ -192,8 +214,21 @@ static int ftdi_i2c_inc_ack_check(struct ftdi_mpsse *ftdi_mpsse)
 		fprintf(stderr, "%s: acks=%u obuf_cnt=%u\n",
 			__func__, ftdi_mpsse->i2c.acks, ftdi_mpsse->obuf_cnt);
 	}
+	if (ret < 0)
+		return ret;
 
-	return ret;
+	return ftdi_i2c_check_rx(ftdi_mpsse, ibuf, size, false);
+}
+
+static int ftdi_i2c_inc_ack_check(struct ftdi_mpsse *ftdi_mpsse)
+{
+	ftdi_mpsse->i2c.acks++;
+	if (ftdi_mpsse->debug & MPSSE_DEBUG_ACKS) {
+		fprintf(stderr, "%s: acks=%u obuf_cnt=%u\n",
+			__func__, ftdi_mpsse->i2c.acks, ftdi_mpsse->obuf_cnt);
+	}
+
+	return ftdi_i2c_check_bufs(ftdi_mpsse, NULL, 0);
 }
 
 int ftdi_i2c_send(struct ftdi_mpsse *ftdi_mpsse, unsigned char c)
@@ -239,6 +274,7 @@ static void ftdi_i2c_send_ack(struct ftdi_mpsse *ftdi_mpsse, bool ack)
 int ftdi_i2c_recv_send_ack(struct ftdi_mpsse *ftdi_mpsse, uint8_t *buf,
 			   size_t count, bool last_nack)
 {
+	unsigned int rd = 0;
 	int ret;
 
 	for (size_t i = 0; i < count; i++) {
@@ -246,6 +282,7 @@ int ftdi_i2c_recv_send_ack(struct ftdi_mpsse *ftdi_mpsse, uint8_t *buf,
 
 		ftdi_mpsse_enqueue(ftdi_mpsse, CMD(CMD_IN_RISING, CMD_BIT, CMD_MSB, CMD_IN));
 		ftdi_mpsse_enqueue(ftdi_mpsse, 0x07);
+		ftdi_mpsse->i2c.bytes++;
 
 		bool nack = last_nack && i == count - 1;
 		ftdi_i2c_send_ack(ftdi_mpsse, !nack);
@@ -256,7 +293,14 @@ int ftdi_i2c_recv_send_ack(struct ftdi_mpsse *ftdi_mpsse, uint8_t *buf,
 			ftdi_mpsse_set_pins(ftdi_mpsse, 0, PIN_SCL | PIN_SDA);
 		}
 
+		ret = ftdi_i2c_check_bufs(ftdi_mpsse, buf + rd, count - rd);
+		if (ret < 0)
+			return ret;
+		rd += ret;
 	}
+
+	if (rd == count)
+		return rd;
 
 	ftdi_mpsse_enqueue(ftdi_mpsse, CMD_SEND_IMMEDIATE);
 
@@ -264,14 +308,7 @@ int ftdi_i2c_recv_send_ack(struct ftdi_mpsse *ftdi_mpsse, uint8_t *buf,
 	if (ret < 0)
 		return ret;
 
-	ret = ftdi_read_data(&ftdi_mpsse->ftdic, buf, count);
-	if (ret != (ssize_t)count) {
-		return ftdi_mpsse_store_error(ftdi_mpsse, ret < 0 ? ret : -1, ret < 0,
-					      "cannot read: rd (%d) != %zu",
-					      ret, count);
-	}
-
-	return 0;
+	return ftdi_i2c_check_rx(ftdi_mpsse, buf + rd, count - rd, true);
 }
 
 int ftdi_i2c_end(struct ftdi_mpsse *ftdi_mpsse)

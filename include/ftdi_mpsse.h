@@ -17,6 +17,7 @@ enum ftdi_mpsse_debug {
 	MPSSE_DEBUG_WRITES	= BIT(2),
 	MPSSE_DEBUG_ACKS	= BIT(3),
 	MPSSE_DEBUG_CLOCK	= BIT(4),
+	MPSSE_DEBUG_FLUSHING	= BIT(5),
 };
 
 struct ftdi_mpsse {
@@ -31,6 +32,7 @@ struct ftdi_mpsse {
 		struct {
 			unsigned int loops_after_read_ack;
 			unsigned int acks;
+			unsigned int bytes;
 			uint8_t address;
 		} i2c;
 	};
