@@ -2,7 +2,8 @@ mpsse_lib = shared_library('ftdi_mpsse',
   [ 'error.c', 'i2c.c', 'mpsse.c' ],
   dependencies: ftdi,
   include_directories: [ '../include' ],
-  install: true)
+  install: true,
+  version: meson.project_version())
 
 mpsse = declare_dependency(link_with : mpsse_lib,
   include_directories : [ '../include' ],

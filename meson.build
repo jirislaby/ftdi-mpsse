@@ -1,5 +1,5 @@
 project('ftdi_mpsse', 'c',
-  version: '1',
+  version: '1.0.0',
   default_options: [
     'optimization=g',
     'warning_level=2',
