@@ -158,11 +158,15 @@ deinit:
 
 void ftdi_mpsse_set_speed(struct ftdi_mpsse *ftdi_mpsse, unsigned int speed, bool three_phase)
 {
-	unsigned int div = 60000000 / speed / 2;
+	unsigned int div = 60000000;
+	unsigned int div_divisor = speed * 2;
 
-	if (three_phase)
-		div = div * 3 / 2;
-	div--;
+	if (three_phase) {
+		div *= 2;
+		div_divisor *= 3;
+	}
+
+	div = div_round_up(div, div_divisor) - 1;
 
 	if (div & ~0xffff)
 		fprintf(stderr, "%s: divisor overflow: speed=%u 3phase=%u div=0x%x\n", __func__,

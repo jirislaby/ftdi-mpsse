@@ -18,6 +18,7 @@ int main(int argc, char **argv)
 	struct ftdi_mpsse ftdi_mpsse;
 	struct ftdi_mpsse_config conf = {
 		  .iface = INTERFACE_ANY,
+		  /* the specs say FAST (400 kHz), but HIGH (3.4 MHz) works for me */
 		  .speed = FTDI_I2C_SPD_HIGH,
 	};
 	bool scroll = false;

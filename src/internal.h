@@ -17,7 +17,7 @@
 #endif
 
 #define ARRAY_SIZE(x)		(sizeof(x) / sizeof(*x))
-#define round_up(x, y)		(((x) + (y) - 1) / (y))
+#define div_round_up(n, div)	(((n) + (div) - 1) / (div))
 #define min(x, y)		((x) < (y) ? (x) : (y))
 #define max(x, y)		((x) > (y) ? (x) : (y))
 

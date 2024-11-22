@@ -155,7 +155,12 @@ int main()
 	struct ftdi_mpsse ftdi_mpsse;
 	struct ftdi_mpsse_config conf = {
 		  .iface = INTERFACE_ANY,
-		  .speed = FTDI_I2C_SPD_HIGH,
+		  /*
+		   * HIGH (3.4 MHz) is supposed to work, but does not
+		   * (perhaps due to ACK stretching not implemented)
+		   */
+		  /* .speed = FTDI_I2C_SPD_HIGH, */
+		  .speed = FTDI_I2C_SPD_HIGH / 2,
 	};
 	uint8_t val;
 	int ret;
