@@ -22,9 +22,8 @@ static int ftdi_mpsse_synchronize(struct ftdi_mpsse *ftdi_mpsse)
 	ftdi_mpsse_enqueue(ftdi_mpsse, CMD_ECHO1);
 	ftdi_mpsse_enqueue(ftdi_mpsse, CMD_SEND_IMMEDIATE);
 	ret = ftdi_mpsse_flush(ftdi_mpsse);
-	if (ret <= 0)
-		return ftdi_mpsse_store_error(ftdi_mpsse, ret, false,
-					      "cannot flush (ECHO)");
+	if (ret < 0)
+		return ret;
 
 	unsigned int a, rd = 0;
 	for (a = 0; a < 5; a++) {
@@ -193,7 +192,7 @@ int ftdi_mpsse_flush(struct ftdi_mpsse *ftdi_mpsse)
 	int ret = ftdi_write_data(&ftdi_mpsse->ftdic, ftdi_mpsse->obuf, ftdi_mpsse->obuf_cnt);
 	if (ret != (int)ftdi_mpsse->obuf_cnt) {
 		return ftdi_mpsse_store_error(ftdi_mpsse, ret < 0 ? ret : -1, ret < 0,
-					      "cannot write: ret (%d) != %u",
+					      "%s: cannot write: ret (%d) != %u", __func__,
 					      ret, ftdi_mpsse->obuf_cnt);
 	}
 

@@ -48,10 +48,8 @@ int ftdi_i2c_init(struct ftdi_mpsse *ftdi_mpsse,
 #endif
 
 	ret = ftdi_mpsse_flush(ftdi_mpsse);
-	if (ret <= 0) {
-		ftdi_mpsse_store_error(ftdi_mpsse, -1, false, "cannot flush (3PHASE)");
+	if (ret < 0)
 		goto close;
-	}
 
 	ftdi_mpsse_set_pins(ftdi_mpsse, PIN_SCL | PIN_SDA, PIN_SCL | PIN_SDA);
 
@@ -60,10 +58,8 @@ int ftdi_i2c_init(struct ftdi_mpsse *ftdi_mpsse,
 	ftdi_mpsse_enqueue(ftdi_mpsse, CMD_LOOPBACK_DIS);
 
 	ret = ftdi_mpsse_flush(ftdi_mpsse);
-	if (ret <= 0) {
-		ftdi_mpsse_store_error(ftdi_mpsse, -1, false, "cannot flush (LOOPBACK)");
+	if (ret < 0)
 		goto close;
-	}
 
 	return 0;
 
@@ -225,8 +221,8 @@ int ftdi_i2c_send_check_ack(struct ftdi_mpsse *ftdi_mpsse, unsigned char c)
 	//ftdi_mpsse_enqueue(ftdi_mpsse, CMD_SEND_IMMEDIATE);
 
 	ret = ftdi_mpsse_flush(ftdi_mpsse);
-	if (ret <= 0)
-		return ret < 0 ? ret : -1;
+	if (ret < 0)
+		return ret;
 
 	return ftdi_i2c_check_ack(ftdi_mpsse, true);
 }
@@ -265,8 +261,8 @@ int ftdi_i2c_recv_send_ack(struct ftdi_mpsse *ftdi_mpsse, uint8_t *buf,
 	ftdi_mpsse_enqueue(ftdi_mpsse, CMD_SEND_IMMEDIATE);
 
 	ret = ftdi_mpsse_flush(ftdi_mpsse);
-	if (ret <= 0)
-		return ret < 0 ? ret : -1;
+	if (ret < 0)
+		return ret;
 
 	ret = ftdi_read_data(&ftdi_mpsse->ftdic, buf, count);
 	if (ret != (ssize_t)count) {
@@ -285,7 +281,7 @@ int ftdi_i2c_end(struct ftdi_mpsse *ftdi_mpsse)
 	ftdi_i2c_stop(ftdi_mpsse);
 
 	ret = ftdi_mpsse_flush(ftdi_mpsse);
-	if (ret <= 0)
+	if (ret < 0)
 		return ret;
 
 	ret = ftdi_i2c_check_ack(ftdi_mpsse, true);
