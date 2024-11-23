@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "ftdi_mpsse.h"
 #include "internal.h"
@@ -153,6 +154,46 @@ close:
 deinit:
 	ftdi_deinit(&ftdi_mpsse->ftdic);
 	return ret;
+}
+
+int ftdi_mpsse_read_dev(struct ftdi_mpsse *ftdi_mpsse, uint8_t *ibuf, size_t size, size_t count,
+			bool check_all)
+{
+	unsigned int to = 100;
+	unsigned int rd = 0;
+
+	if (!count)
+		return 0;
+
+	while (1) {
+		int now_rd = ftdi_read_data(&ftdi_mpsse->ftdic, ibuf + rd, size - rd);
+		if (now_rd < 0)
+			return ftdi_mpsse_store_error(ftdi_mpsse, now_rd, true, "ftdi_read_data");
+
+		if (now_rd == 0 && to < 90)
+			fprintf(stderr, "no input (rd=%d, count=%zu), trying (%u)\n",
+				rd, count, to);
+		rd += now_rd;
+		if (rd >= count)
+			break;
+		if (!to--)
+			return ftdi_mpsse_store_error(ftdi_mpsse, -1, false, "TIMEOUT");
+
+		if (!check_all)
+			break;
+
+		usleep(10000);
+	}
+
+	if (ftdi_mpsse->debug & MPSSE_DEBUG_READS) {
+		fprintf(stderr, "%s: asked %zuB, received %uB (expected %zuB, c_a=%u):",
+			__func__, size, rd, count, check_all);
+		for (unsigned a = 0; a < rd; a++)
+			fprintf(stderr, " %02x", ibuf[a]);
+		fprintf(stderr, "\n");
+	}
+
+	return rd;
 }
 
 void ftdi_mpsse_set_speed(struct ftdi_mpsse *ftdi_mpsse, unsigned int speed, bool three_phase)

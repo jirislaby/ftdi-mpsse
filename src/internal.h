@@ -35,6 +35,8 @@ int __local ftdi_mpsse_store_error(struct ftdi_mpsse *ftdi_mpsse, int ret,
 
 int __local ftdi_mpsse_init(struct ftdi_mpsse *ftdi_mpsse,
 			    const struct ftdi_mpsse_config *conf);
+int __local ftdi_mpsse_read_dev(struct ftdi_mpsse *ftdi_mpsse, uint8_t *ibuf, size_t size,
+				size_t count, bool check_all);
 void __local ftdi_mpsse_set_speed(struct ftdi_mpsse *ftdi_mpsse, unsigned int speed,
 				  bool three_phase);
 int __local ftdi_mpsse_flush(struct ftdi_mpsse *ftdi_mpsse);

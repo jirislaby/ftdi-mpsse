@@ -116,53 +116,13 @@ int ftdi_i2c_begin(struct ftdi_mpsse *ftdi_mpsse, uint8_t address, bool write)
 	return ftdi_i2c_send_check_ack(ftdi_mpsse, address << 1 | !write);
 }
 
-static int ftdi_i2c_read_dev(struct ftdi_mpsse *ftdi_mpsse, uint8_t *ibuf, size_t size,
-			     size_t count, bool check_all)
-{
-	unsigned int to = 100;
-	unsigned int rd = 0;
-
-	if (!count)
-		return 0;
-
-	while (1) {
-		int now_rd = ftdi_read_data(&ftdi_mpsse->ftdic, ibuf + rd, size - rd);
-		if (now_rd < 0)
-			return ftdi_mpsse_store_error(ftdi_mpsse, now_rd, true, "ftdi_read_data");
-
-		if (now_rd == 0 && to < 90)
-			fprintf(stderr, "i2c-%x: no input (rd=%d, count=%zu), trying (%u)\n",
-				ftdi_mpsse->i2c.address, rd, count, to);
-		rd += now_rd;
-		if (rd >= count)
-			break;
-		if (!to--)
-			return ftdi_mpsse_store_error(ftdi_mpsse, -1, false, "TIMEOUT");
-
-		if (!check_all)
-			break;
-
-		usleep(10000);
-	}
-
-	if (ftdi_mpsse->debug & MPSSE_DEBUG_READS) {
-		fprintf(stderr, "%s: i2c-%x: asked %zuB, received %uB (expected %zuB, c_a=%u):",
-			__func__, ftdi_mpsse->i2c.address, size, rd, count, check_all);
-		for (unsigned a = 0; a < rd; a++)
-			fprintf(stderr, " %02x", ibuf[a]);
-		fprintf(stderr, "\n");
-	}
-
-	return rd;
-}
-
 static int ftdi_i2c_check_ack(struct ftdi_mpsse *ftdi_mpsse, bool check_all)
 {
 	unsigned int acks = ftdi_mpsse->i2c.acks;
 	uint8_t ibuf[acks + 16];
 	int ret;
 
-	ret = ftdi_i2c_read_dev(ftdi_mpsse, ibuf, sizeof(ibuf), acks, check_all);
+	ret = ftdi_mpsse_read_dev(ftdi_mpsse, ibuf, sizeof(ibuf), acks, check_all);
 	if (ret <= 0)
 		return ret;
 
@@ -185,7 +145,7 @@ static int ftdi_i2c_check_rx(struct ftdi_mpsse *ftdi_mpsse, uint8_t *ibuf, size_
 	unsigned int bytes = ftdi_mpsse->i2c.bytes;
 	int ret;
 
-	ret = ftdi_i2c_read_dev(ftdi_mpsse, ibuf, size, bytes, check_all);
+	ret = ftdi_mpsse_read_dev(ftdi_mpsse, ibuf, size, bytes, check_all);
 	if (ret <= 0)
 		return ret;
 
